@@ -885,6 +885,17 @@ describe('PATCH /api/settings/profile', () => {
     expect(res.json().language).toBe('ja')
   })
 
+  it('updates language to zh', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/profile',
+      headers: json,
+      payload: { language: 'zh' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().language).toBe('zh')
+  })
+
   it('returns 400 for empty account_name', async () => {
     const res = await app.inject({
       method: 'PATCH',
@@ -946,6 +957,17 @@ describe('PATCH /api/settings/preferences', () => {
     })
     expect(res.statusCode).toBe(200)
     expect(res.json()['reading.date_mode']).toBe('absolute')
+  })
+
+  it('updates translate.target_lang to zh', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'translate.target_lang': 'zh' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()['translate.target_lang']).toBe('zh')
   })
 
   it('returns 400 for invalid enum value', async () => {
