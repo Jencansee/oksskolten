@@ -164,6 +164,10 @@ export async function rebuildSearchIndex(): Promise<void> {
  * full refresh still happens periodically.
  */
 export async function ensureSearchIndex(): Promise<void> {
+  // Step 1: existence and population check. Failures here usually mean
+  // Meilisearch is unreachable, so we want to fall through to the rebuild
+  // path so the startup retry loop can confirm whether Meili is back.
+  let populatedDocCount = 0
   try {
     const client = getSearchClient()
     const { results: existingIndexes } = await client.getIndexes()
@@ -171,19 +175,30 @@ export async function ensureSearchIndex(): Promise<void> {
     if (articles) {
       const stats = await client.index(ARTICLES_INDEX).getStats()
       if (stats.numberOfDocuments > 0) {
-        // Apply current INDEX_SETTINGS idempotently so a redeploy that
-        // changed filterableAttributes / searchableAttributes / etc. still
-        // picks up the new schema without paying for a full rebuild.
-        // Meilisearch treats matching settings as a no-op.
-        await client.index(ARTICLES_INDEX).updateSettings(INDEX_SETTINGS).waitTask({ timeout: MEILI_TASK_TIMEOUT_MS })
-        searchReady = true
-        log.info(`Search index already populated (${stats.numberOfDocuments} docs); skipping startup rebuild`)
-        return
+        populatedDocCount = stats.numberOfDocuments
       }
     }
   } catch (err) {
-    log.warn('ensureSearchIndex check failed; falling through to rebuild:', err)
+    log.warn('ensureSearchIndex existence check failed; falling through to rebuild:', err)
   }
+
+  if (populatedDocCount > 0) {
+    // Step 2: schema sync. Apply current INDEX_SETTINGS idempotently so a
+    // redeploy that changed filterableAttributes / searchableAttributes
+    // picks up the new schema without paying for a full rebuild.
+    // Deliberately do NOT fall back to rebuildSearchIndex on failure here:
+    // the only way this fails is Meilisearch queue pressure or a transient
+    // error, and triggering a full rebuild (delete + create + swap +
+    // batches) under that condition is exactly what produced the original
+    // "Index articles_staging already exists" pile-up. Surface the error
+    // to the startup retry loop instead so it backs off cleanly.
+    const client = getSearchClient()
+    await client.index(ARTICLES_INDEX).updateSettings(INDEX_SETTINGS).waitTask({ timeout: MEILI_TASK_TIMEOUT_MS })
+    searchReady = true
+    log.info(`Search index already populated (${populatedDocCount} docs); skipping startup rebuild`)
+    return
+  }
+
   await rebuildSearchIndex()
   if (!searchReady) {
     // rebuildSearchIndex swallows its own errors and just leaves

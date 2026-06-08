@@ -203,6 +203,25 @@ describe('ensureSearchIndex', () => {
     expect(mockCreateIndex).toHaveBeenCalled()
   })
 
+  it('throws on settings-apply failure without triggering a full rebuild', async () => {
+    // Index is populated, so the skip path applies. If updateSettings hits
+    // a timeout (the same queue-pressure symptom that motivated this
+    // change), we must NOT cascade into the heavy rebuild because that
+    // would worsen the queue. Surface the error to the startup retry loop
+    // instead.
+    mockGetIndexes.mockResolvedValue({ results: [{ uid: 'articles' }] })
+    mockGetStats.mockResolvedValue({ numberOfDocuments: 42 })
+    mockWaitTask.mockRejectedValueOnce(new Error('MeiliSearchTaskTimeOutError: timeout'))
+
+    await expect(ensureSearchIndex()).rejects.toThrow()
+    expect(mockUpdateSettings).toHaveBeenCalledTimes(1)
+    // The full-rebuild operations must not have been reached.
+    expect(mockCreateIndex).not.toHaveBeenCalled()
+    expect(mockDeleteIndex).not.toHaveBeenCalled()
+    expect(mockSwapIndexes).not.toHaveBeenCalled()
+    expect(isSearchReady()).toBe(false)
+  })
+
   it('throws when the fallthrough rebuild fails so the startup retry loop can back off', async () => {
     // No indexes exist, so ensureSearchIndex must fall through to rebuild.
     // Make rebuildSearchIndex hit a hard failure that its internal catch
