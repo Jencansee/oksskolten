@@ -143,6 +143,40 @@ export async function rebuildSearchIndex(): Promise<void> {
   }
 }
 
+/**
+ * Idempotent startup hook for search. Inspects the Meilisearch state and
+ * only triggers a full `rebuildSearchIndex()` if the articles index is
+ * missing or empty. When the index is already populated — the common case
+ * after a tsx-watch HMR restart or a normal prod redeploy — flip
+ * searchReady on and return immediately.
+ *
+ * This avoids the race that happens when each restart fires a fresh
+ * rebuild while the previous process's index-management tasks are still
+ * in the Meilisearch queue (the symptom is "Index `articles_staging`
+ * already exists" failures and waitTask timeouts piling up).
+ *
+ * The 6-hour cron continues to call `rebuildSearchIndex()` directly so a
+ * full refresh still happens periodically.
+ */
+export async function ensureSearchIndex(): Promise<void> {
+  try {
+    const client = getSearchClient()
+    const { results: existingIndexes } = await client.getIndexes()
+    const articles = existingIndexes.find((idx: { uid: string }) => idx.uid === ARTICLES_INDEX)
+    if (articles) {
+      const stats = await client.index(ARTICLES_INDEX).getStats()
+      if (stats.numberOfDocuments > 0) {
+        searchReady = true
+        log.info(`Search index already populated (${stats.numberOfDocuments} docs); skipping startup rebuild`)
+        return
+      }
+    }
+  } catch (err) {
+    log.warn('ensureSearchIndex check failed; falling through to rebuild:', err)
+  }
+  await rebuildSearchIndex()
+}
+
 // --- Fire-and-forget sync helpers ---
 
 export function syncArticleToSearch(doc: MeiliArticleDoc): void {
