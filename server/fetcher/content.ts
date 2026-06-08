@@ -11,14 +11,18 @@ import type { ParseHtmlInput, ParseHtmlResult } from './contentWorker.js'
 // Always reference .js — tsx resolves .js → .ts transparently during development;
 // compiled .js files exist in dist/ for production. Resolves at the build layer
 // rather than with a runtime branch.
-// JSDOM allocates 3-4 instances per parse, so the worker heap budget needs
-// headroom for heavy pages (Reuters, Medium-class sites with large inline
-// scripts). 256MB caused silent worker OOMs and forced articles to fall
-// back to the much shorter RSS excerpt. 512MB is still constrained but
-// realistic for typical content extraction.
+//
+// JSDOM allocates 3-4 instances per parse, so each worker needs heap headroom
+// for heavy pages (Reuters, Medium-class sites with large inline scripts).
+// Use Worker resourceLimits.maxOldGenerationSizeMb instead of putting
+// --max-old-space-size in execArgv: Node validates worker execArgv and rejects
+// V8 memory flags, which broke startup under tsx dev mode.
 const pool = new PiscinaPool({
   filename: new URL('./contentWorker.js', import.meta.url).href,
-  execArgv: [...process.execArgv, '--max-old-space-size=512'],
+  execArgv: process.execArgv,
+  resourceLimits: {
+    maxOldGenerationSizeMb: 512,
+  },
   maxThreads: Number(process.env.PARSE_MAX_THREADS) || 2,
   // Keep at least one warm worker. minThreads: 0 forced a cold spawn for the
   // first task in every sparse batch; the spawn-plus-parse latency could
