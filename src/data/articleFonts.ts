@@ -58,7 +58,7 @@ export const articleFonts: ArticleFont[] = [
   {
     value: 'system-serif',
     label: 'System Serif',
-    family: 'serif',
+    family: 'ui-serif, "New York", Charter, Cambria, "Times New Roman", serif',
     googleFontsUrl: null,
     category: 'serif',
   },
