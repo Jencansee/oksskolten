@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { Piscina as PiscinaPool } from 'piscina'
 import { JSDOM } from 'jsdom'
 import { fetchHtml } from './http.js'
@@ -7,18 +9,24 @@ import type { ParseHtmlInput, ParseHtmlResult } from './contentWorker.js'
 
 // Worker pool for CPU-intensive DOM parsing (jsdom + Readability + Turndown).
 // Runs on separate threads so the main event loop stays responsive for API requests.
-// Inherit the parent's execArgv so the tsx TypeScript loader is available in workers.
-// Always reference .js — tsx resolves .js → .ts transparently during development;
-// compiled .js files exist in dist/ for production. Resolves at the build layer
-// rather than with a runtime branch.
+//
+// Resolve the worker file by checking the filesystem rather than branching on
+// NODE_ENV. The compiled .js exists only in production builds (dist-server/),
+// while the .ts source is what's on disk under tsx dev. tsx's loader hooks
+// don't intercept the Worker entry-point URL — it must point at a file that
+// actually exists.
 //
 // JSDOM allocates 3-4 instances per parse, so each worker needs heap headroom
 // for heavy pages (Reuters, Medium-class sites with large inline scripts).
 // Use Worker resourceLimits.maxOldGenerationSizeMb instead of putting
 // --max-old-space-size in execArgv: Node validates worker execArgv and rejects
-// V8 memory flags, which broke startup under tsx dev mode.
+// V8 memory flags.
+const jsWorkerUrl = new URL('./contentWorker.js', import.meta.url)
+const tsWorkerUrl = new URL('./contentWorker.ts', import.meta.url)
+const workerUrl = fs.existsSync(fileURLToPath(jsWorkerUrl)) ? jsWorkerUrl : tsWorkerUrl
+
 const pool = new PiscinaPool({
-  filename: new URL('./contentWorker.js', import.meta.url).href,
+  filename: workerUrl.href,
   execArgv: process.execArgv,
   resourceLimits: {
     maxOldGenerationSizeMb: 512,
