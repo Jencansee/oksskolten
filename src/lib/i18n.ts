@@ -510,6 +510,8 @@ const dict = {
   'integration.task.chat': { ja: 'チャット', en: 'Chat', zh: '聊天'},
   'integration.task.summary': { ja: '要約', en: 'Summary', zh: '摘要'},
   'integration.task.translate': { ja: '翻訳', en: 'Translation', zh: '翻译'},
+  'integration.maxTokens': { ja: '最大出力トークン数', en: 'Max output tokens', zh: '最大输出 token 数'},
+  'integration.maxTokensDesc': { ja: '空欄でデフォルト値を使用。コンテキスト長が短いローカルLLMでは小さくしてください', en: 'Empty uses the default. Lower this for local LLMs with small context windows', zh: '留空使用默认值。上下文窗口较小的本地 LLM 请调低此值'},
   'integration.modeLLM': { ja: 'LLM', en: 'LLM', zh: 'LLM'},
   'integration.modeTranslateService': { ja: '翻訳サービス', en: 'Translation Service', zh: '翻译服务'},
   'integration.googleTranslateNote': {

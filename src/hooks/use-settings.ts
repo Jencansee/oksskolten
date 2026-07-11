@@ -45,8 +45,10 @@ interface Prefs {
   'chat.model': string | null
   'summary.provider': string | null
   'summary.model': string | null
+  'summary.max_tokens': string | null
   'translate.provider': string | null
   'translate.model': string | null
+  'translate.max_tokens': string | null
   'translate.target_lang': string | null
   'custom_themes': string | null
 }
@@ -84,6 +86,8 @@ export function useSettings() {
   const [translateProvider, setTranslateProviderState] = useState<string | null>(null)
   const [translateModel, setTranslateModelState] = useState<string | null>(null)
   const [translateTargetLang, setTranslateTargetLangState] = useState<string | null>(null)
+  const [summaryMaxTokens, setSummaryMaxTokensState] = useState<string | null>(null)
+  const [translateMaxTokens, setTranslateMaxTokensState] = useState<string | null>(null)
 
   // --- DB sync ---
   const { data: prefs, mutate: mutatePrefs } = useSWR<Prefs>(
@@ -175,6 +179,8 @@ export function useSettings() {
       { key: 'translate.provider', setter: setTranslateProviderState },
       { key: 'translate.model', setter: setTranslateModelState },
       { key: 'translate.target_lang', setter: setTranslateTargetLangState },
+      { key: 'summary.max_tokens', setter: setSummaryMaxTokensState },
+      { key: 'translate.max_tokens', setter: setTranslateMaxTokensState },
     ]
 
     for (const { key, setter, backfillRef, validate } of hydrationMap) {
@@ -316,6 +322,8 @@ export function useSettings() {
     syncedSetTranslateProvider,
     syncedSetTranslateModel,
     syncedSetTranslateTargetLang,
+    syncedSetSummaryMaxTokens,
+    syncedSetTranslateMaxTokens,
   } = useMemo(() => {
     const make = <T extends string>(key: keyof Prefs, setter: (v: T) => void) =>
       (value: T) => {
@@ -351,6 +359,8 @@ export function useSettings() {
       syncedSetTranslateProvider: make<string>('translate.provider', setTranslateProviderState),
       syncedSetTranslateModel: make<string>('translate.model', setTranslateModelState),
       syncedSetTranslateTargetLang: make<string>('translate.target_lang', setTranslateTargetLangState),
+      syncedSetSummaryMaxTokens: make<string>('summary.max_tokens', setSummaryMaxTokensState),
+      syncedSetTranslateMaxTokens: make<string>('translate.max_tokens', setTranslateMaxTokensState),
     }
     // scheduleSave and dirtyKeysRef are stable refs; remaining setters are useState/useCallback-stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -439,6 +449,10 @@ export function useSettings() {
     setTranslateModel: syncedSetTranslateModel,
     translateTargetLang,
     setTranslateTargetLang: syncedSetTranslateTargetLang,
+    summaryMaxTokens,
+    setSummaryMaxTokens: syncedSetSummaryMaxTokens,
+    translateMaxTokens,
+    setTranslateMaxTokens: syncedSetTranslateMaxTokens,
     keyboardNavigation,
     setKeyboardNavigation: syncedSetKeyboardNavigation,
     keybindings,
