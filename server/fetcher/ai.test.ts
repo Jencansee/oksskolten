@@ -130,6 +130,30 @@ describe('summarizeArticle', () => {
     expect(params.maxTokens).toBe(2048)
   })
 
+  it('uses summary.max_tokens override from settings', async () => {
+    mockGetSetting.mockImplementation((key: string) => {
+      if (key === 'summary.max_tokens') return '512'
+      return null
+    })
+    mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
+    await summarizeArticle('text')
+
+    const params = mockCreateMessage.mock.calls[0][0]
+    expect(params.maxTokens).toBe(512)
+  })
+
+  it('falls back to default when summary.max_tokens is not a positive integer', async () => {
+    mockGetSetting.mockImplementation((key: string) => {
+      if (key === 'summary.max_tokens') return 'not-a-number'
+      return null
+    })
+    mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
+    await summarizeArticle('text')
+
+    const params = mockCreateMessage.mock.calls[0][0]
+    expect(params.maxTokens).toBe(2048)
+  })
+
   it('uses custom model from settings', async () => {
     mockGetSetting.mockImplementation((key: string) => {
       if (key === 'summary.model') return 'claude-sonnet-4-6'
@@ -209,6 +233,18 @@ describe('translateArticle', () => {
 
     const params = mockCreateMessage.mock.calls[0][0]
     expect(params.maxTokens).toBe(16384)
+  })
+
+  it('uses translate.max_tokens override from settings', async () => {
+    mockGetSetting.mockImplementation((key: string) => {
+      if (key === 'translate.max_tokens') return '4096'
+      return null
+    })
+    mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
+    await translateArticle('text')
+
+    const params = mockCreateMessage.mock.calls[0][0]
+    expect(params.maxTokens).toBe(4096)
   })
 
   it('uses translate-specific settings keys', async () => {

@@ -58,8 +58,22 @@ interface AiTaskConfig {
   providerKey: string
   modelKey: string
   defaultModel: string
-  maxTokens: number
+  maxTokensKey: string
+  defaultMaxTokens: number
   buildPrompt: (text: string) => string
+}
+
+/**
+ * Resolve the max output tokens for an AI task. A positive integer stored in
+ * settings overrides the built-in default; anything else (unset, empty,
+ * malformed) falls back. Lets users with local LLMs (vLLM, Ollama) whose
+ * context window is smaller than the defaults lower the completion cap.
+ */
+function resolveMaxTokens(config: AiTaskConfig): number {
+  const raw = getSetting(config.maxTokensKey)
+  if (!raw) return config.defaultMaxTokens
+  const parsed = Number(raw)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : config.defaultMaxTokens
 }
 
 async function runAiTask(
@@ -72,14 +86,15 @@ async function runAiTask(
   const provider = getProvider(providerName)
   provider.requireKey()
   const prompt = config.buildPrompt(fullText)
+  const maxTokens = resolveMaxTokens(config)
   const result = onText
     ? await provider.streamMessage(
-        { model, maxTokens: config.maxTokens, messages: [{ role: 'user', content: prompt }] },
+        { model, maxTokens, messages: [{ role: 'user', content: prompt }] },
         onText,
       )
     : await provider.createMessage({
         model,
-        maxTokens: config.maxTokens,
+        maxTokens,
         messages: [{ role: 'user', content: prompt }],
       })
   return {
@@ -98,7 +113,8 @@ const summarizeConfig: AiTaskConfig = {
   providerKey: 'summary.provider',
   modelKey: 'summary.model',
   defaultModel: TASK_DEFAULTS.summarize.model,
-  maxTokens: SUMMARIZE_MAX_TOKENS,
+  maxTokensKey: 'summary.max_tokens',
+  defaultMaxTokens: SUMMARIZE_MAX_TOKENS,
   buildPrompt: buildSummarizePrompt,
 }
 
@@ -106,7 +122,8 @@ const translateConfig: AiTaskConfig = {
   providerKey: 'translate.provider',
   modelKey: 'translate.model',
   defaultModel: TASK_DEFAULTS.translate.model,
-  maxTokens: TRANSLATE_MAX_TOKENS,
+  maxTokensKey: 'translate.max_tokens',
+  defaultMaxTokens: TRANSLATE_MAX_TOKENS,
   buildPrompt: buildTranslatePrompt,
 }
 
